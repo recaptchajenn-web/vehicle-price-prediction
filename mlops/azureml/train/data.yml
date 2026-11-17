@@ -1,6 +1,6 @@
-$schema: https://azuremlschemas.azureedge.net/latest/data.schema.json
 
-type: uri_file
-name: used-cars-data # Provide the name for the dataset, related to used cars
-description:  used cars dataset to predict price  # Provide the description for the dataset, related to used cars
-path: ../../../data/used_cars.csv
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: used-cars-train-env
+image: mcr.microsoft.com/azureml/openmpi3.1.2-ubuntu18.04
+conda_file: ../../../data-science/environment/train-conda.yml
+description: Used cars training environment
