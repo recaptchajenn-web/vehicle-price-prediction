@@ -1,67 +1,93 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
+
 """
 Registers the best-trained ML model from the sweep job.
 """
 
 import argparse
-from pathlib import Path
-import mlflow
-import os 
 import json
+from pathlib import Path
+
+import mlflow
+
 
 def parse_args():
-    '''Parse input arguments'''
+    """Parse command-line arguments."""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', type=_____, help='Name under which model will be registered')  # Hint: Specify the type for model_name (str)
-    parser.add_argument('--model_path', type=_____, help='Model directory')  # Hint: Specify the type for model_path (str)
-    parser.add_argument("--model_info_output_path", type=_____, help="Path to write model info JSON")  # Hint: Specify the type for model_info_output_path (str)
-    args, _ = parser.parse_known_args()
-    print(f'Arguments: {args}')
 
-    return args
+    parser.add_argument(
+        "--model_name",
+        type=str,
+        required=True,
+        help="Name under which model will be registered"
+    )
+
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        required=True,
+        help="Path to the existing trained MLflow model"
+    )
+
+    parser.add_argument(
+        "--model_info_output_path",
+        type=str,
+        required=True,
+        help="Directory for model_info.json"
+    )
+
+    return parser.parse_args()
+
 
 def main(args):
-    '''Loads the best-trained model from the sweep job and registers it'''
+    """Register the existing trained MLflow model."""
 
-    print("Registering ", args.model_name)
+    print("Registering model:", args.model_name)
+    print("MLflow version:", mlflow.__version__)
 
-    # Load model
-    model = mlflow.sklearn.load_model(args._______)  # Load the model from model_path
+    # Locate the existing model produced by the sweep
+    model_path = Path(args.model_path).resolve()
 
-    # Log model using mlflow
-    mlflow.sklearn._______(model, args._______)  # Log the model using with model_name
+    # Validate that the input is an MLflow model
+    if not (model_path / "MLmodel").is_file():
+        raise FileNotFoundError(
+            f"MLflow model metadata not found in {model_path}"
+        )
 
-    # Register logged model using mlflow
-    run_id = mlflow.active_run().info.run_id
-    model_uri = f'runs:/{run_id}/{args.model_name}'
-    mlflow_model = mlflow.__________(model_uri, args._______)  # register the model with model_uri and model_name
-    model_version = mlflow_model._______  # Get the version of the registered model
+    # Register the saved model directly.
+    # Do not log or serialize it again.
+    model_uri = model_path.as_uri()
 
-    # Write model info
-    print("Writing JSON")
-    model_info = {"id": f"{args.model_name}:{model_version}"}
-    output_path = os.path.join(args.model_info_output_path, "________.json")  # Specify the name of the JSON file (model_info.json)
-    with open(output_path, "w") as of:
-        json._____(model_info, of)  # write model_info to the output file
+    registered_model = mlflow.register_model(
+        model_uri=model_uri,
+        name=args.model_name
+    )
+
+    # Retrieve the registered model version
+    model_version = registered_model.version
+
+    print("Model registered successfully!")
+    print("Model name:", args.model_name)
+    print("Model version:", model_version)
+
+    # Preserve the output expected by the pipeline
+    output_dir = Path(args.model_info_output_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    model_info = {
+        "id": f"{args.model_name}:{model_version}",
+        "name": args.model_name,
+        "version": str(model_version)
+    }
+
+    output_path = output_dir / "model_info.json"
+
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(model_info, f, indent=2)
+
+    print("Model information saved to:", output_path)
+
 
 if __name__ == "__main__":
-    
-    mlflow.start_run()
-    
-    # Parse Arguments
     args = parse_args()
-    
-    lines = [
-        f"Model name: {args.________}",
-        f"Model path: {args.________}",
-        f"Model info output path: {args.________}"
-    ]
-
-    for line in lines:
-        print(line)
-
     main(args)
-
-    mlflow.end_run()
